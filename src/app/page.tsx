@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Radar,
@@ -9,7 +9,6 @@ import {
   Layers,
   Zap,
   ShieldCheck,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   FileCode,
@@ -20,12 +19,34 @@ import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { RadarScanner } from '@/components/RadarScanner';
 import { TelegramChatSimulator } from '@/components/TelegramChatSimulator';
+import { AuthModal } from '@/components/AuthModal';
 import { useLanguage } from '@/lib/i18n';
 import { SHOW_BILLING } from '@/lib/config';
 
 export default function LandingPage() {
   const { t } = useLanguage();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('signup');
+  const [user, setUser] = useState<{ email: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user) setUser(data.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  const openAuth = (mode: 'login' | 'signup' = 'signup') => {
+    if (user) {
+      window.location.href = '/app/competitors';
+      return;
+    }
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+  };
 
   const toggleFaq = (idx: number) => {
     setOpenFaq(openFaq === idx ? null : idx);
@@ -62,20 +83,20 @@ export default function LandingPage() {
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
-                <Link
-                  href="/signup"
+                <button
+                  onClick={() => openAuth('signup')}
                   className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-semibold text-base shadow-[0_0_25px_rgba(61,255,176,0.3)] transition-all flex items-center justify-center gap-2 group"
                 >
-                  <Radar className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                  {t('hero.startBtn')}
+                  <Radar className="w-5 h-5 group-hover:-rotate-90 transition-transform" />
+                  <span>{user ? t('nav.dashboard') : t('hero.startBtn')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link
+                </button>
+                <a
                   href="#how-it-works"
                   className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-radar-card border border-radar-border hover:border-radar-accent/40 text-radar-text font-medium text-base hover:bg-[#161C28] transition-all flex items-center justify-center gap-2"
                 >
                   {t('hero.howBtn')}
-                </Link>
+                </a>
               </div>
 
               {/* Trust Indicators */}
@@ -105,8 +126,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 2. КАК ЭТО РАБОТАЕТ */}
-      <section id="how-it-works" className="py-24 border-b border-radar-border/40 relative">
+      {/* 2. КАК ЭТО РАБОТАЕТ (Плавный скролл) */}
+      <section id="how-it-works" className="py-24 border-b border-radar-border/40 relative scroll-mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
             <span className="text-xs uppercase tracking-widest text-radar-accent font-semibold">
@@ -172,8 +193,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 3. ОСОБЕННОСТИ И РАДАР */}
-      <section id="features" className="py-24 border-b border-radar-border/40 bg-[#0C1017]">
+      {/* 3. ОСОБЕННОСТИ И РАДАР (Плавный скролл) */}
+      <section id="features" className="py-24 border-b border-radar-border/40 bg-[#0C1017] scroll-mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-5 flex justify-center">
@@ -285,21 +306,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 5. ТАРИФЫ (УСЛОВНО СКРЫТЫ ПРИ SHOW_BILLING = false) */}
-      {SHOW_BILLING && (
-        <section id="pricing" className="py-24 border-b border-radar-border/40 bg-[#0C1017]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white font-heading">
-                Тарифные планы
-              </h2>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 6. FAQ */}
-      <section id="faq" className="py-24 border-b border-radar-border/40">
+      {/* 5. FAQ (Плавный скролл) */}
+      <section id="faq" className="py-24 border-b border-radar-border/40 scroll-mt-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 space-y-4">
             <span className="text-xs uppercase tracking-widest text-radar-accent font-semibold">
@@ -341,7 +349,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 7. ФИНАЛЬНЫЙ CTA */}
+      {/* 6. ФИНАЛЬНЫЙ CTA */}
       <section className="py-20 relative overflow-hidden bg-gradient-to-b from-[#0C1017] to-radar-bg">
         <div className="absolute inset-0 bg-radar-accent/5 blur-3xl pointer-events-none" />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6 relative z-10">
@@ -352,19 +360,26 @@ export default function LandingPage() {
             {t('cta.subtitle')}
           </p>
           <div className="pt-2">
-            <Link
-              href="/signup"
+            <button
+              onClick={() => openAuth('signup')}
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-bold text-base shadow-[0_0_30px_rgba(61,255,176,0.35)] transition-all group"
             >
-              <Radar className="w-5 h-5 group-hover:rotate-45 transition-transform" />
-              {t('cta.btn')}
+              <Radar className="w-5 h-5 group-hover:-rotate-45 transition-transform" />
+              <span>{user ? t('nav.dashboard') : t('cta.btn')}</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            </button>
           </div>
         </div>
       </section>
 
       <Footer />
+
+      {/* Auth Modal Popup */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
+      />
     </div>
   );
 }

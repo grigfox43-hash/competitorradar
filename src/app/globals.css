@@ -8,6 +8,11 @@
   --background-end-rgb: 11, 14, 20;
 }
 
+/* Smooth anchor scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   color: rgb(var(--foreground-rgb));
   background: #0B0E14;
@@ -15,13 +20,18 @@ body {
   overflow-x: hidden;
 }
 
-/* Custom Radar Sweep Animation */
+/* Offset for fixed navbar on anchor navigation */
+section[id] {
+  scroll-margin-top: 5rem;
+}
+
+/* Custom Radar Sweep Animation: rotates COUNTER-CLOCKWISE (opposite direction) */
 @keyframes radarSpin {
   from {
-    transform: rotate(0deg);
+    transform: rotate(360deg);
   }
   to {
-    transform: rotate(360deg);
+    transform: rotate(0deg);
   }
 }
 
