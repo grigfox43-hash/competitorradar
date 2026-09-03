@@ -8,28 +8,23 @@ import {
   Play,
   Trash2,
   ExternalLink,
-  Power,
   Clock,
   Sparkles,
-  AlertTriangle,
-  History,
   CheckCircle2,
   Loader2,
+  ShieldCheck,
 } from 'lucide-react';
 import { CompetitorUrl } from '@/lib/types';
 import { AddCompetitorModal } from '@/components/AddCompetitorModal';
+import { useLanguage } from '@/lib/i18n';
+import { SHOW_BILLING } from '@/lib/config';
 
 export default function CompetitorsPage() {
+  const { t } = useLanguage();
   const [competitors, setCompetitors] = useState<CompetitorUrl[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [userStats, setUserStats] = useState({
-    used: 0,
-    limit: 5,
-    planName: 'Business',
-    canAddMore: true,
-  });
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -39,7 +34,6 @@ export default function CompetitorsPage() {
       if (res.ok) {
         const data = await res.json();
         setCompetitors(data.competitors || []);
-        if (data.stats) setUserStats(data.stats);
       }
     } catch (e) {
       console.error(e);
@@ -74,7 +68,7 @@ export default function CompetitorsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот сайт из мониторинга?')) return;
+    if (!confirm('Вы уверены, что хотите удалить этот сайт? / Are you sure?')) return;
     try {
       const res = await fetch(`/api/competitors?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -98,96 +92,54 @@ export default function CompetitorsPage() {
       if (res.ok) {
         const result = data.results?.[0];
         if (result?.status === 'alert_created') {
-          setStatusMessage(`🎯 AI обнаружил существенные изменения на ${label}! Новый алерт записан в ленту.`);
+          setStatusMessage(`🎯 AI: ${label} — ${result.alert?.summary || 'Новые изменения зафиксированы'}`);
         } else if (result?.status === 'unchanged') {
-          setStatusMessage(`✅ Страница ${label} проверена: изменений с прошлого снапшота нет.`);
+          setStatusMessage(`✅ ${label}: без изменений.`);
         } else {
-          setStatusMessage(`📡 Страница ${label} успешно просканирована.`);
+          setStatusMessage(`📡 ${label}: снимок сохранён.`);
         }
         await loadData();
       }
     } catch (err: any) {
-      setStatusMessage(`Ошибка сканирования: ${err.message}`);
+      setStatusMessage(`Error: ${err.message}`);
     } finally {
       setScanningId(null);
     }
   };
 
-  const progressPercent = Math.min(
-    100,
-    Math.round((userStats.used / Math.max(1, userStats.limit)) * 100)
-  );
-
   return (
     <div className="space-y-6">
-      {/* Top Header & Limits Bar */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white font-heading">
-            Отслеживаемые конкуренты
+            {t('comp.title')}
           </h1>
           <p className="text-xs text-radar-muted mt-1">
-            Управляйте страницами для автоматического анализа и сравнения изменений
+            {t('comp.subtitle')}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {userStats.canAddMore ? (
-            <button
-              onClick={() => setModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-semibold text-xs shadow-[0_0_15px_rgba(61,255,176,0.2)] flex items-center gap-1.5 transition"
-            >
-              <Plus className="w-4 h-4" />
-              Добавить URL
-            </button>
-          ) : (
-            <Link
-              href="/app/settings/billing"
-              className="px-4 py-2 rounded-xl bg-radar-warning hover:bg-radar-warning/90 text-black font-semibold text-xs transition"
-            >
-              Улучшить тариф
-            </Link>
-          )}
+          <button
+            onClick={() => setModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-semibold text-xs shadow-[0_0_15px_rgba(61,255,176,0.2)] flex items-center gap-1.5 transition"
+          >
+            <Plus className="w-4 h-4" />
+            {t('dash.addUrl')}
+          </button>
         </div>
       </div>
 
-      {/* Plan Usage Indicator (Spec 5.1) */}
-      <div className="radar-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#111724]">
-        <div className="space-y-1.5 flex-1 max-w-md">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-radar-muted">
-              Использование лимита тарифа <strong>{userStats.planName}</strong>:
-            </span>
-            <span className="text-white font-semibold font-mono">
-              {userStats.used} из {userStats.limit} URL
-            </span>
-          </div>
-          <div className="w-full h-2 bg-[#0B0E14] rounded-full overflow-hidden border border-radar-border">
-            <div
-              className={`h-full transition-all duration-500 rounded-full ${
-                progressPercent > 80 ? 'bg-radar-warning' : 'bg-radar-accent'
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
+      {/* Access indicator */}
+      <div className="radar-card p-3.5 flex items-center justify-between bg-[#111724]">
+        <div className="flex items-center gap-2 text-xs text-radar-text">
+          <ShieldCheck className="w-4 h-4 text-radar-accent" />
+          <span>{t('comp.unlimited')}: {competitors.length} сайтов в базе данных</span>
         </div>
-
-        <div className="flex items-center gap-3 text-xs">
-          {userStats.used >= userStats.limit ? (
-            <span className="text-radar-alert flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5" /> Лимит исчерпан
-            </span>
-          ) : (
-            <span className="text-radar-accent flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Свободно {userStats.limit - userStats.used} слотов
-            </span>
-          )}
-          <Link
-            href="/app/settings/billing"
-            className="text-xs text-radar-muted hover:text-white underline"
-          >
-            Сменить тариф
-          </Link>
+        <div className="text-xs text-radar-accent font-mono flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-radar-accent animate-ping" />
+          <span>AI Cloud Monitor</span>
         </div>
       </div>
 
@@ -208,24 +160,24 @@ export default function CompetitorsPage() {
       {loading ? (
         <div className="radar-card p-12 text-center text-radar-muted flex flex-col items-center justify-center gap-3">
           <Loader2 className="w-6 h-6 text-radar-accent animate-spin" />
-          <span className="text-xs">Загрузка данных мониторинга...</span>
+          <span className="text-xs">Загрузка...</span>
         </div>
       ) : competitors.length === 0 ? (
-        /* Empty State (Spec 5.1) */
+        /* Empty State */
         <div className="radar-card p-12 text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-[#161C28] border border-radar-border flex items-center justify-center mx-auto text-radar-accent">
             <Globe className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-bold text-white">Нет отслеживаемых сайтов</h3>
+          <h3 className="text-lg font-bold text-white">{t('comp.emptyTitle')}</h3>
           <p className="text-xs text-radar-muted max-w-sm mx-auto">
-            Добавьте первого конкурента, чтобы запустить формирование baseline снапшота и автоматическое AI-слежение.
+            {t('comp.emptyDesc')}
           </p>
           <button
             onClick={() => setModalOpen(true)}
             className="px-5 py-2.5 rounded-xl bg-radar-accent text-black font-semibold text-xs shadow-lg inline-flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Добавить первого конкурента
+            {t('comp.addFirst')}
           </button>
         </div>
       ) : (
@@ -234,12 +186,12 @@ export default function CompetitorsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-[#0E131D] text-radar-muted uppercase tracking-wider text-[11px] border-b border-radar-border">
                 <tr>
-                  <th className="py-3.5 px-4 font-semibold">Конкурент</th>
-                  <th className="py-3.5 px-4 font-semibold">URL страницы</th>
-                  <th className="py-3.5 px-4 font-semibold">Частота</th>
-                  <th className="py-3.5 px-4 font-semibold">Последняя проверка</th>
-                  <th className="py-3.5 px-4 font-semibold">Статус</th>
-                  <th className="py-3.5 px-4 font-semibold text-right">Действия</th>
+                  <th className="py-3.5 px-4 font-semibold">{t('comp.colName')}</th>
+                  <th className="py-3.5 px-4 font-semibold">{t('comp.colUrl')}</th>
+                  <th className="py-3.5 px-4 font-semibold">{t('comp.colFreq')}</th>
+                  <th className="py-3.5 px-4 font-semibold">{t('comp.colLast')}</th>
+                  <th className="py-3.5 px-4 font-semibold">{t('comp.colStatus')}</th>
+                  <th className="py-3.5 px-4 font-semibold text-right">{t('comp.colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-radar-border/60">
@@ -250,7 +202,6 @@ export default function CompetitorsPage() {
                       key={comp.id}
                       className="hover:bg-[#141A26] transition-colors group"
                     >
-                      {/* Name */}
                       <td className="py-4 px-4 font-semibold text-white">
                         <div className="flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-radar-accent" />
@@ -258,7 +209,6 @@ export default function CompetitorsPage() {
                         </div>
                       </td>
 
-                      {/* URL */}
                       <td className="py-4 px-4 text-radar-muted font-mono">
                         <a
                           href={comp.url}
@@ -271,7 +221,6 @@ export default function CompetitorsPage() {
                         </a>
                       </td>
 
-                      {/* Frequency Badge */}
                       <td className="py-4 px-4">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
@@ -283,14 +232,13 @@ export default function CompetitorsPage() {
                           }`}
                         >
                           {comp.monitoring_frequency === 'realtime'
-                            ? 'Реалтайм'
+                            ? t('comp.realtime')
                             : comp.monitoring_frequency === 'daily'
-                            ? 'Ежедневно'
-                            : 'Еженедельно'}
+                            ? t('comp.daily')
+                            : t('comp.weekly')}
                         </span>
                       </td>
 
-                      {/* Last Checked */}
                       <td className="py-4 px-4 text-radar-muted">
                         <div className="flex items-center gap-1.5 text-[11px]">
                           <Clock className="w-3 h-3 text-radar-muted/70" />
@@ -302,12 +250,11 @@ export default function CompetitorsPage() {
                                   hour: '2-digit',
                                   minute: '2-digit',
                                 })
-                              : 'Ожидает проверки'}
+                              : '—'}
                           </span>
                         </div>
                       </td>
 
-                      {/* Status Toggle */}
                       <td className="py-4 px-4">
                         <button
                           onClick={() => handleToggleActive(comp.id)}
@@ -322,19 +269,17 @@ export default function CompetitorsPage() {
                               comp.is_active ? 'bg-radar-accent animate-pulse' : 'bg-radar-muted'
                             }`}
                           />
-                          <span>{comp.is_active ? 'Активен' : 'Пауза'}</span>
+                          <span>{comp.is_active ? t('comp.active') : t('comp.pause')}</span>
                         </button>
                       </td>
 
-                      {/* Actions */}
                       <td className="py-4 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Run scan right now */}
                           <button
                             onClick={() => handleScanSingle(comp.id, comp.label)}
                             disabled={isScanning}
                             className="p-1.5 rounded-lg text-radar-accent hover:bg-radar-accent/15 transition border border-radar-accent/20"
-                            title="Запустить AI-проверку сейчас"
+                            title={t('comp.runScan')}
                           >
                             {isScanning ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -343,11 +288,10 @@ export default function CompetitorsPage() {
                             )}
                           </button>
 
-                          {/* Delete */}
                           <button
                             onClick={() => handleDelete(comp.id)}
                             className="p-1.5 rounded-lg text-radar-muted hover:text-radar-alert hover:bg-radar-alert/15 transition"
-                            title="Удалить из мониторинга"
+                            title={t('comp.delete')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -362,12 +306,10 @@ export default function CompetitorsPage() {
         </div>
       )}
 
-      {/* Add modal */}
       <AddCompetitorModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSuccess={loadData}
-        userPlan={userStats.planName.toLowerCase()}
       />
     </div>
   );

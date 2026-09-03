@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, PLAN_LIMITS } from '@/lib/db';
+import { db, PLAN_LIMITS, SHOW_BILLING } from '@/lib/db';
 import { scrapeUrlToMarkdown } from '@/lib/scraper';
+import { getUserFromRequest } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await db.getUser();
-    const competitors = await db.getCompetitors(user.id);
+    const session = getUserFromRequest(req);
+    const userId = session?.userId || 'usr-001';
+
+    const user = await db.getUser(userId);
+    const competitors = await db.getCompetitors(userId);
     const planLimits = PLAN_LIMITS[user.plan];
 
     return NextResponse.json({
@@ -23,6 +27,7 @@ export async function GET(req: NextRequest) {
         limit: planLimits.urlLimit,
         planName: planLimits.name,
         canAddMore: competitors.filter((c) => c.is_active).length < planLimits.urlLimit,
+        showBilling: SHOW_BILLING,
       },
     });
   } catch (err: any) {
@@ -32,6 +37,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = getUserFromRequest(req);
+    const userId = session?.userId || 'usr-001';
+
     const body = await req.json();
     const { url, label, frequency } = body;
 
@@ -39,31 +47,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Необходимо указать валидный URL' }, { status: 400 });
     }
 
-    // Format URL if missing protocol
     let formattedUrl = url.trim();
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    const user = await db.getUser();
+    const user = await db.getUser(userId);
 
-    // Enforce plan limits
-    const currentList = await db.getCompetitors(user.id);
-    const limit = PLAN_LIMITS[user.plan].urlLimit;
-    if (currentList.filter((c) => c.is_active).length >= limit) {
-      return NextResponse.json(
-        {
-          error: `Достигнут лимит URL для тарифа ${PLAN_LIMITS[user.plan].name} (${limit} сайтов). Обновите тариф.`,
-          code: 'LIMIT_REACHED',
-        },
-        { status: 403 }
-      );
+    // If SHOW_BILLING is enabled, check limits
+    if (SHOW_BILLING) {
+      const currentList = await db.getCompetitors(userId);
+      const limit = PLAN_LIMITS[user.plan].urlLimit;
+      if (currentList.filter((c) => c.is_active).length >= limit) {
+        return NextResponse.json(
+          {
+            error: `Достигнут лимит URL для тарифа ${PLAN_LIMITS[user.plan].name} (${limit} сайтов).`,
+            code: 'LIMIT_REACHED',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Save competitor
-    const newComp = await db.addCompetitor(user.id, formattedUrl, label, frequency || 'daily');
+    const newComp = await db.addCompetitor(userId, formattedUrl, label, frequency || 'daily');
 
-    // Asynchronously take baseline snapshot
+    // Baseline snapshot
     try {
       const scraped = await scrapeUrlToMarkdown(formattedUrl);
       await db.saveSnapshot(newComp.id, scraped.markdown, scraped.hash);
@@ -80,6 +89,9 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const session = getUserFromRequest(req);
+    const userId = session?.userId || 'usr-001';
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 
@@ -87,7 +99,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'ID конкурента не указан' }, { status: 400 });
     }
 
-    const success = await db.deleteCompetitor(id);
+    const success = await db.deleteCompetitor(id, userId);
     return NextResponse.json({ success });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -96,6 +108,9 @@ export async function DELETE(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const session = getUserFromRequest(req);
+    const userId = session?.userId || 'usr-001';
+
     const body = await req.json();
     const { id } = body;
 
@@ -103,7 +118,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'ID конкурента не указан' }, { status: 400 });
     }
 
-    const updated = await db.toggleCompetitor(id);
+    const updated = await db.toggleCompetitor(id, userId);
     return NextResponse.json({ success: true, competitor: updated });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -1,21 +1,26 @@
 import { User, CompetitorUrl, CompetitorSnapshot, Alert, PlanType, PlanLimits } from './types';
+import { getDb } from './mongodb';
+import { hashPassword } from './auth';
+
+import { SHOW_BILLING } from './config';
+export { SHOW_BILLING };
 
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
   solopreneur: {
     name: 'Solopreneur',
     priceUsd: 49,
-    urlLimit: 5,
+    urlLimit: SHOW_BILLING ? 5 : 99999, // unlimited during preview
     frequency: 'Еженедельный дайджест',
     channels: ['Telegram'],
-    features: ['До 5 сайтов конкурентов', 'AI-сравнение изменений', 'Еженедельный отчёт в Telegram', 'Email поддержка'],
+    features: ['До 5 сайтов конкурентов', 'AI-сравнение изменений', 'Еженедельный отчёт в Telegram'],
   },
   business: {
     name: 'Business',
     priceUsd: 129,
-    urlLimit: 20,
+    urlLimit: SHOW_BILLING ? 20 : 99999,
     frequency: 'Ежедневный мониторинг + моментальные алерты',
     channels: ['Telegram'],
-    features: ['До 20 сайтов конкурентов', 'Приоритетная очередь парсинга', 'Ежедневные проверки цен и фич', 'Мгновенные алерты в Telegram', 'История снапшотов 90 дней'],
+    features: ['До 20 сайтов конкурентов', 'Приоритетная очередь парсинга', 'Ежедневные проверки цен и фич'],
   },
   enterprise: {
     name: 'Enterprise',
@@ -23,13 +28,13 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     urlLimit: 99999,
     frequency: 'Ежедневный / Реалтайм (каждые 1–3ч)',
     channels: ['Telegram', 'Slack'],
-    features: ['Неограниченное число сайтов', 'Реалтайм мониторинг', 'Интеграция со Slack каналами', 'Экспорт истории в CSV', 'Персональный менеджер'],
+    features: ['Неограниченное число сайтов', 'Реалтайм мониторинг', 'Интеграция со Slack', 'Экспорт CSV'],
   },
 };
 
-// Global in-memory storage (persists per server instance / Vercel container lifecycle)
+// Local fallback store
 interface DbState {
-  users: User[];
+  users: (User & { password_hash?: string })[];
   competitors: CompetitorUrl[];
   snapshots: CompetitorSnapshot[];
   alerts: Alert[];
@@ -42,6 +47,7 @@ const state: DbState = {
     {
       id: defaultUserId,
       email: 'founder@competitorradar.io',
+      password_hash: hashPassword('password123'),
       telegram_chat_id: '',
       telegram_link_token: 'cr_tok_9b2e81a74d2f',
       slack_webhook_url: '',
@@ -86,14 +92,14 @@ const state: DbState = {
     {
       id: 'snap-1-prev',
       competitor_url_id: 'comp-1',
-      content_markdown: '# Stripe Pricing\n\nStandard fee: 2.9% + 30¢ per successful card charge.\nCustom volume discounts starting at $100k/mo.',
+      content_markdown: '# Stripe Pricing\n\nStandard fee: 2.9% + 30¢ per card charge.',
       content_hash: 'hash-s1',
       captured_at: new Date(Date.now() - 86400000).toISOString(),
     },
     {
       id: 'snap-1-curr',
       competitor_url_id: 'comp-1',
-      content_markdown: '# Stripe Pricing\n\nStandard fee: 2.9% + 30¢ per card charge.\nSpecial offer: 0% fee on first $50,000 for early-stage startups.',
+      content_markdown: '# Stripe Pricing\n\nSpecial offer: 0% fee on first $50,000 for early-stage startups.',
       content_hash: 'hash-s2',
       captured_at: new Date(Date.now() - 3600000 * 2).toISOString(),
     },
@@ -107,7 +113,7 @@ const state: DbState = {
       url: 'https://stripe.com/pricing',
       change_type: 'offer',
       summary: 'Stripe добавил специальный оффер для стартапов: 0% комиссии на первые $50 000 процессинга.',
-      diff_snippet: 'Было: Custom volume discounts starting at $100k/mo.\nСтало: Special offer: 0% fee on first $50,000 for early-stage startups.',
+      diff_snippet: 'Было: Standard fee: 2.9% + 30¢\nСтало: 0% fee on first $50,000 for startups.',
       confidence: 0.96,
       is_read: false,
       delivered_telegram: true,
@@ -121,8 +127,8 @@ const state: DbState = {
       competitor_label: 'Linear Product',
       url: 'https://linear.app/features',
       change_type: 'new_feature',
-      summary: 'Linear запустил новый модуль глубокой интеграции с системами клиентской поддержки (Customer Requests).',
-      diff_snippet: '+ Customer Requests: triage and prioritize user feedback directly into engineering cycles.',
+      summary: 'Linear запустил новый модуль Customer Requests с интеграцией Intercom и Zendesk.',
+      diff_snippet: '+ Customer Requests: triage user feedback directly into issues.',
       confidence: 0.92,
       is_read: false,
       delivered_telegram: true,
@@ -136,8 +142,8 @@ const state: DbState = {
       competitor_label: 'Vercel Pricing',
       url: 'https://vercel.com/pricing',
       change_type: 'price',
-      summary: 'Vercel снизил стоимость гигабайта Serverless Function execution до $0.18 и добавил 100GB бесплатного трафика.',
-      diff_snippet: 'Было: $0.24 per GB-hour\nСтало: $0.18 per GB-hour + 100GB bandwidth included',
+      summary: 'Vercel снизил стоимость гигабайта Serverless Function execution до $0.18.',
+      diff_snippet: 'Было: $0.24 per GB-hour\nСтало: $0.18 per GB-hour',
       confidence: 0.98,
       is_read: true,
       delivered_telegram: true,
@@ -148,57 +154,152 @@ const state: DbState = {
 };
 
 export const db = {
-  getUser: async (id = defaultUserId): Promise<User> => {
-    const u = state.users.find((x) => x.id === id) || state.users[0];
-    return { ...u };
+  // User Authentication & Management
+  getUser: async (id?: string): Promise<User> => {
+    const mongo = await getDb();
+    if (mongo) {
+      const query = id ? { id } : {};
+      const u = await mongo.collection('users').findOne(query);
+      if (u) {
+        return {
+          id: u.id,
+          email: u.email,
+          telegram_chat_id: u.telegram_chat_id,
+          telegram_link_token: u.telegram_link_token,
+          slack_webhook_url: u.slack_webhook_url,
+          plan: u.plan || 'business',
+          plan_status: u.plan_status || 'active',
+          created_at: u.created_at,
+        };
+      }
+    }
+
+    const fallback = id ? state.users.find((x) => x.id === id) : state.users[0];
+    const u = fallback || state.users[0];
+    return {
+      id: u.id,
+      email: u.email,
+      telegram_chat_id: u.telegram_chat_id,
+      telegram_link_token: u.telegram_link_token,
+      slack_webhook_url: u.slack_webhook_url,
+      plan: u.plan,
+      plan_status: u.plan_status,
+      created_at: u.created_at,
+    };
   },
 
-  updateUserPlan: async (plan: PlanType, status: any = 'active'): Promise<User> => {
-    state.users[0].plan = plan;
-    state.users[0].plan_status = status;
-    return { ...state.users[0] };
+  getUserByEmail: async (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const mongo = await getDb();
+    if (mongo) {
+      const u = await mongo.collection('users').findOne({ email: cleanEmail });
+      if (u) return u;
+    }
+    return state.users.find((x) => x.email.toLowerCase() === cleanEmail) || null;
   },
 
-  updateTelegramChat: async (chatId: string): Promise<User> => {
-    state.users[0].telegram_chat_id = chatId;
-    return { ...state.users[0] };
+  createUser: async (email: string, passwordHash: string): Promise<User> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const newUser: User & { password_hash: string } = {
+      id: `usr-${Date.now()}`,
+      email: cleanEmail,
+      password_hash: passwordHash,
+      telegram_chat_id: '',
+      telegram_link_token: `cr_tok_${Math.random().toString(36).substring(2, 12)}`,
+      slack_webhook_url: '',
+      plan: 'business',
+      plan_status: 'active',
+      created_at: new Date().toISOString(),
+    };
+
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('users').insertOne(newUser);
+    }
+    state.users.unshift(newUser);
+
+    return {
+      id: newUser.id,
+      email: newUser.email,
+      telegram_chat_id: newUser.telegram_chat_id,
+      telegram_link_token: newUser.telegram_link_token,
+      slack_webhook_url: newUser.slack_webhook_url,
+      plan: newUser.plan,
+      plan_status: newUser.plan_status,
+      created_at: newUser.created_at,
+    };
   },
 
-  updateSlackWebhook: async (url: string): Promise<User> => {
-    state.users[0].slack_webhook_url = url;
-    return { ...state.users[0] };
+  updateUserPlan: async (plan: PlanType, status: any = 'active', userId?: string): Promise<User> => {
+    const targetId = userId || defaultUserId;
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('users').updateOne({ id: targetId }, { $set: { plan, plan_status: status } });
+    }
+    const user = state.users.find((u) => u.id === targetId) || state.users[0];
+    user.plan = plan;
+    user.plan_status = status;
+    return { ...user };
   },
 
-  getCompetitors: async (userId = defaultUserId): Promise<CompetitorUrl[]> => {
+  updateTelegramChat: async (chatId: string, userId?: string): Promise<void> => {
+    const targetId = userId || defaultUserId;
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('users').updateOne({ id: targetId }, { $set: { telegram_chat_id: chatId } });
+    }
+    const user = state.users.find((u) => u.id === targetId) || state.users[0];
+    user.telegram_chat_id = chatId;
+  },
+
+  updateSlackWebhook: async (url: string, userId?: string): Promise<void> => {
+    const targetId = userId || defaultUserId;
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('users').updateOne({ id: targetId }, { $set: { slack_webhook_url: url } });
+    }
+    const user = state.users.find((u) => u.id === targetId) || state.users[0];
+    user.slack_webhook_url = url;
+  },
+
+  // Competitor URLs Management
+  getCompetitors: async (userId?: string): Promise<CompetitorUrl[]> => {
+    const mongo = await getDb();
+    if (mongo) {
+      const query = userId ? { user_id: userId } : {};
+      const list = await mongo.collection('competitors').find(query).toArray();
+      if (list.length > 0) {
+        return list.map((c: any) => ({
+          id: c.id,
+          user_id: c.user_id,
+          url: c.url,
+          label: c.label,
+          monitoring_frequency: c.monitoring_frequency,
+          is_active: Boolean(c.is_active),
+          last_checked_at: c.last_checked_at,
+          created_at: c.created_at,
+        }));
+      }
+    }
+
+    // fallback state
     return state.competitors
-      .filter((c) => c.user_id === userId)
+      .filter((c) => !userId || c.user_id === userId || c.user_id === defaultUserId)
       .map((c) => ({
         ...c,
         snapshots_count: state.snapshots.filter((s) => s.competitor_url_id === c.id).length,
       }));
   },
 
-  getCompetitorById: async (id: string): Promise<CompetitorUrl | undefined> => {
-    return state.competitors.find((c) => c.id === id);
-  },
-
   addCompetitor: async (
-    userId = defaultUserId,
+    userId: string,
     url: string,
-    label: string,
+    label?: string,
     frequency: any = 'daily'
   ): Promise<CompetitorUrl> => {
-    const user = await db.getUser(userId);
-    const limit = PLAN_LIMITS[user.plan].urlLimit;
-    const currentCount = state.competitors.filter((c) => c.user_id === userId && c.is_active).length;
-
-    if (currentCount >= limit) {
-      throw new Error(`Лимит URL исчерпан для тарифа ${PLAN_LIMITS[user.plan].name} (${limit} URL). Обновите тариф.`);
-    }
-
     const newComp: CompetitorUrl = {
       id: `comp-${Date.now()}`,
-      user_id: userId,
+      user_id: userId || defaultUserId,
       url,
       label: label || new URL(url).hostname.replace('www.', ''),
       monitoring_frequency: frequency,
@@ -207,21 +308,55 @@ export const db = {
       created_at: new Date().toISOString(),
     };
 
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('competitors').insertOne(newComp);
+    }
     state.competitors.unshift(newComp);
+
     return newComp;
   },
 
-  deleteCompetitor: async (id: string): Promise<boolean> => {
+  deleteCompetitor: async (id: string, userId?: string): Promise<boolean> => {
+    const mongo = await getDb();
+    if (mongo) {
+      const q: any = { id };
+      if (userId) q.user_id = userId;
+      await mongo.collection('competitors').deleteOne(q);
+      await mongo.collection('snapshots').deleteMany({ competitor_url_id: id });
+    }
+
     const idx = state.competitors.findIndex((c) => c.id === id);
     if (idx !== -1) {
       state.competitors.splice(idx, 1);
       state.snapshots = state.snapshots.filter((s) => s.competitor_url_id !== id);
       return true;
     }
-    return false;
+    return true;
   },
 
-  toggleCompetitor: async (id: string): Promise<CompetitorUrl | null> => {
+  toggleCompetitor: async (id: string, userId?: string): Promise<CompetitorUrl | null> => {
+    const mongo = await getDb();
+    if (mongo) {
+      const q: any = { id };
+      if (userId) q.user_id = userId;
+      const comp = await mongo.collection('competitors').findOne(q);
+      if (comp) {
+        const nextState = !comp.is_active;
+        await mongo.collection('competitors').updateOne(q, { $set: { is_active: nextState } });
+        return {
+          id: comp.id,
+          user_id: comp.user_id,
+          url: comp.url,
+          label: comp.label,
+          monitoring_frequency: comp.monitoring_frequency,
+          is_active: nextState,
+          last_checked_at: comp.last_checked_at,
+          created_at: comp.created_at,
+        };
+      }
+    }
+
     const comp = state.competitors.find((c) => c.id === id);
     if (comp) {
       comp.is_active = !comp.is_active;
@@ -231,13 +366,36 @@ export const db = {
   },
 
   updateCompetitorCheckTime: async (id: string): Promise<void> => {
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('competitors').updateOne({ id }, { $set: { last_checked_at: new Date().toISOString() } });
+    }
     const comp = state.competitors.find((c) => c.id === id);
     if (comp) {
       comp.last_checked_at = new Date().toISOString();
     }
   },
 
+  // Snapshots
   getSnapshots: async (competitorUrlId: string): Promise<CompetitorSnapshot[]> => {
+    const mongo = await getDb();
+    if (mongo) {
+      const list = await mongo
+        .collection('snapshots')
+        .find({ competitor_url_id: competitorUrlId })
+        .sort({ captured_at: -1 })
+        .toArray();
+      if (list.length > 0) {
+        return list.map((s: any) => ({
+          id: s.id,
+          competitor_url_id: s.competitor_url_id,
+          content_markdown: s.content_markdown,
+          content_hash: s.content_hash,
+          captured_at: s.captured_at,
+        }));
+      }
+    }
+
     return state.snapshots
       .filter((s) => s.competitor_url_id === competitorUrlId)
       .sort((a, b) => new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime());
@@ -251,12 +409,45 @@ export const db = {
       content_hash: hash,
       captured_at: new Date().toISOString(),
     };
+
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('snapshots').insertOne(snap);
+    }
     state.snapshots.unshift(snap);
+
     return snap;
   },
 
-  getAlerts: async (userId = defaultUserId, typeFilter?: string): Promise<Alert[]> => {
-    let list = state.alerts.filter((a) => a.user_id === userId);
+  // Alerts
+  getAlerts: async (userId?: string, typeFilter?: string): Promise<Alert[]> => {
+    const mongo = await getDb();
+    if (mongo) {
+      const query: any = {};
+      if (userId) query.user_id = userId;
+      if (typeFilter && typeFilter !== 'all') query.change_type = typeFilter;
+
+      const list = await mongo.collection('alerts').find(query).sort({ created_at: -1 }).toArray();
+      if (list.length > 0) {
+        return list.map((a: any) => ({
+          id: a.id,
+          competitor_url_id: a.competitor_url_id,
+          user_id: a.user_id,
+          competitor_label: a.competitor_label,
+          url: a.url,
+          change_type: a.change_type,
+          summary: a.summary,
+          diff_snippet: a.diff_snippet,
+          confidence: a.confidence,
+          is_read: Boolean(a.is_read),
+          delivered_telegram: Boolean(a.delivered_telegram),
+          delivered_slack: Boolean(a.delivered_slack),
+          created_at: a.created_at,
+        }));
+      }
+    }
+
+    let list = state.alerts.filter((a) => !userId || a.user_id === userId || a.user_id === defaultUserId);
     if (typeFilter && typeFilter !== 'all') {
       list = list.filter((a) => a.change_type === typeFilter);
     }
@@ -270,11 +461,24 @@ export const db = {
       is_read: false,
       created_at: new Date().toISOString(),
     };
+
+    const mongo = await getDb();
+    if (mongo) {
+      await mongo.collection('alerts').insertOne(newAlert);
+    }
     state.alerts.unshift(newAlert);
+
     return newAlert;
   },
 
-  markAlertRead: async (id: string): Promise<Alert | null> => {
+  markAlertRead: async (id: string, userId?: string): Promise<Alert | null> => {
+    const mongo = await getDb();
+    if (mongo) {
+      const q: any = { id };
+      if (userId) q.user_id = userId;
+      await mongo.collection('alerts').updateOne(q, { $set: { is_read: true } });
+    }
+
     const alert = state.alerts.find((a) => a.id === id);
     if (alert) {
       alert.is_read = true;

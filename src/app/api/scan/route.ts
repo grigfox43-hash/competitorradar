@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { scrapeUrlToMarkdown } from '@/lib/scraper';
 import { compareSnapshotsWithGemini } from '@/lib/gemini';
+import { getUserFromRequest } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
+    const session = getUserFromRequest(req);
+    const userId = session?.userId || 'usr-001';
+
     const body = await req.json().catch(() => ({}));
     const { competitorId } = body;
 
-    const user = await db.getUser();
-    let competitorsToScan = await db.getCompetitors(user.id);
+    const user = await db.getUser(userId);
+    let competitorsToScan = await db.getCompetitors(userId);
 
     if (competitorId) {
       competitorsToScan = competitorsToScan.filter((c) => c.id === competitorId);
@@ -22,14 +26,10 @@ export async function POST(req: NextRequest) {
     const results = [];
 
     for (const comp of competitorsToScan) {
-      // 1. Scrape current URL
       const currentScrape = await scrapeUrlToMarkdown(comp.url);
-
-      // 2. Fetch previous snapshots
       const history = await db.getSnapshots(comp.id);
       const previousSnapshot = history.length > 0 ? history[0] : null;
 
-      // 3. Save new snapshot
       await db.saveSnapshot(comp.id, currentScrape.markdown, currentScrape.hash);
       await db.updateCompetitorCheckTime(comp.id);
 
@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // If hash matches identically, no change
       if (previousSnapshot.content_hash === currentScrape.hash) {
         results.push({
           competitorId: comp.id,
@@ -54,7 +53,6 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // 4. Compare with Gemini AI
       const comparison = await compareSnapshotsWithGemini(
         previousSnapshot.content_markdown,
         currentScrape.markdown
@@ -63,7 +61,7 @@ export async function POST(req: NextRequest) {
       if (comparison.has_significant_change) {
         const newAlert = await db.addAlert({
           competitor_url_id: comp.id,
-          user_id: user.id,
+          user_id: userId,
           competitor_label: comp.label,
           url: comp.url,
           change_type: comparison.change_type,

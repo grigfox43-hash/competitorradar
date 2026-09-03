@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Radar,
   Globe,
@@ -14,29 +14,41 @@ import {
   Play,
   LogOut,
   ExternalLink,
-  ChevronRight,
   Menu,
   X,
-  Sparkles,
   Loader2,
+  UserCheck,
 } from 'lucide-react';
 import { AddCompetitorModal } from '@/components/AddCompetitorModal';
+import { useLanguage } from '@/lib/i18n';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { SHOW_BILLING } from '@/lib/config';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { t } = useLanguage();
+
   const [modalOpen, setModalOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [userPlan, setUserPlan] = useState('business');
-  const [unreadCount, setUnreadCount] = useState(2);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ email: string } | null>(null);
 
   const fetchUserData = async () => {
     try {
-      const res = await fetch('/api/competitors');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user?.plan) setUserPlan(data.user.plan);
+      const authRes = await fetch('/api/auth/me');
+      if (authRes.ok) {
+        const authData = await authRes.json();
+        if (authData.user) {
+          setCurrentUser(authData.user);
+        } else {
+          // Unauthenticated -> redirect to login
+          router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+          return;
+        }
       }
+
       const aRes = await fetch('/api/alerts');
       if (aRes.ok) {
         const aData = await aRes.json();
@@ -47,14 +59,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     fetchUserData();
-  }, []);
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  };
 
   const handleGlobalScan = async () => {
     setScanning(true);
     try {
       const res = await fetch('/api/scan', { method: 'POST' });
       if (res.ok) {
-        // trigger reload on current page
         window.dispatchEvent(new Event('competitor-updated'));
         await fetchUserData();
       }
@@ -66,12 +83,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const navItems = [
-    { label: 'Конкуренты', href: '/app/competitors', icon: Globe },
-    { label: 'Лента алертов', href: '/app/alerts', icon: Bell, badge: unreadCount },
-    { label: 'Привязка Telegram', href: '/app/settings/telegram', icon: Send },
-    { label: 'Интеграция Slack', href: '/app/settings/slack', icon: Slack },
-    { label: 'Тариф и биллинг', href: '/app/settings/billing', icon: CreditCard },
-    { label: 'Экспорт данных', href: '/app/settings/export', icon: Download },
+    { label: t('dash.competitors'), href: '/app/competitors', icon: Globe },
+    { label: t('dash.alerts'), href: '/app/alerts', icon: Bell, badge: unreadCount },
+    { label: t('dash.telegram'), href: '/app/settings/telegram', icon: Send },
+    { label: t('dash.slack'), href: '/app/settings/slack', icon: Slack },
+    ...(SHOW_BILLING ? [{ label: t('dash.billing'), href: '/app/settings/billing', icon: CreditCard }] : []),
+    { label: t('dash.export'), href: '/app/settings/export', icon: Download },
   ];
 
   return (
@@ -122,26 +139,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        {/* Sidebar Footer */}
+        {/* Sidebar Footer: User Info & Logout */}
         <div className="p-4 border-t border-radar-border bg-[#0B0E14]/60 space-y-3">
-          <div className="p-3 rounded-xl bg-radar-card border border-radar-border flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-radar-muted uppercase">Ваш тариф</span>
-              <span className="text-xs font-bold text-white uppercase">{userPlan}</span>
+          {currentUser && (
+            <div className="p-2.5 rounded-xl bg-radar-card border border-radar-border flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-radar-accent/15 text-radar-accent flex items-center justify-center flex-shrink-0">
+                  <UserCheck className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] text-radar-muted truncate">{t('dash.loggedAs')}</div>
+                  <div className="text-xs font-semibold text-white truncate">{currentUser.email}</div>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 rounded-lg text-radar-muted hover:text-radar-alert hover:bg-radar-alert/10 transition"
+                title={t('dash.logout')}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <Link
-              href="/app/settings/billing"
-              className="text-[10px] font-semibold text-radar-accent hover:underline"
-            >
-              Изменить
-            </Link>
-          </div>
+          )}
 
           <Link
             href="/"
             className="flex items-center justify-between text-xs text-radar-muted hover:text-white py-1 px-1 transition"
           >
-            <span>На главную страницу</span>
+            <span>{t('dash.home')}</span>
             <ExternalLink className="w-3 h-3" />
           </Link>
         </div>
@@ -152,7 +177,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Top Navbar */}
         <header className="h-16 px-4 sm:px-6 bg-[#0E121B]/90 border-b border-radar-border backdrop-blur flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-3">
-            {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
               className="md:hidden p-2 rounded-lg text-radar-muted hover:text-white hover:bg-radar-card"
@@ -163,28 +187,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-radar-accent animate-ping" />
               <span className="text-xs text-radar-muted font-mono hidden sm:inline">
-                РАДАР АКТИВЕН • ОРКЕСТРАЦИЯ 24/7
+                {t('dash.statusActive')}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Language Switcher */}
+            <LanguageSwitcher />
+
             {/* Global scan button */}
             <button
               onClick={handleGlobalScan}
               disabled={scanning}
               className="px-3.5 py-1.5 rounded-xl border border-radar-border hover:border-radar-accent/40 bg-radar-card text-xs text-radar-text font-medium flex items-center gap-1.5 transition disabled:opacity-50"
-              title="Запустить немедленное сканирование всех активных сайтов"
+              title={t('dash.scanNow')}
             >
               {scanning ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-radar-accent" />
-                  <span className="hidden sm:inline">AI-сканирование...</span>
+                  <span className="hidden sm:inline">{t('dash.scanning')}</span>
                 </>
               ) : (
                 <>
                   <Play className="w-3.5 h-3.5 text-radar-accent" />
-                  <span className="hidden sm:inline">Просканировать сейчас</span>
+                  <span className="hidden sm:inline">{t('dash.scanNow')}</span>
                 </>
               )}
             </button>
@@ -195,7 +222,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="px-4 py-1.5 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-semibold text-xs shadow-[0_0_15px_rgba(61,255,176,0.25)] flex items-center gap-1.5 transition"
             >
               <span>+</span>
-              <span>Добавить URL</span>
+              <span>{t('dash.addUrl')}</span>
             </button>
           </div>
         </header>
@@ -217,6 +244,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {item.label}
               </Link>
             ))}
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-radar-alert hover:bg-radar-alert/10"
+            >
+              {t('dash.logout')}
+            </button>
           </div>
         )}
 
@@ -234,7 +267,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           window.dispatchEvent(new Event('competitor-updated'));
           fetchUserData();
         }}
-        userPlan={userPlan}
       />
     </div>
   );

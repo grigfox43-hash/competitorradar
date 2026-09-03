@@ -5,6 +5,9 @@ const nextConfig = {
   images: {
     domains: ["images.unsplash.com", "avatars.githubusercontent.com"],
   },
+  experimental: {
+    serverComponentsExternalPackages: ["mongodb"],
+  },
 };
 
 module.exports = nextConfig;

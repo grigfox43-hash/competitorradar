@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Send, CheckCircle2, AlertTriangle, ExternalLink, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { Send, CheckCircle2, AlertTriangle, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n';
 
 export default function TelegramSettingsPage() {
+  const { t } = useLanguage();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -36,7 +38,7 @@ export default function TelegramSettingsPage() {
       const json = await res.json();
       setTestResult(json.message || 'Тестовое сообщение отправлено!');
     } catch (err: any) {
-      setTestResult(`Ошибка: ${err.message}`);
+      setTestResult(`Error: ${err.message}`);
     } finally {
       setTesting(false);
     }
@@ -44,24 +46,22 @@ export default function TelegramSettingsPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white font-heading">
-          Привязка Telegram
+          {t('tg.title')}
         </h1>
         <p className="text-xs text-radar-muted mt-1">
-          Получайте оперативные алерты о действиях конкурентов прямо в ваш мессенджер
+          {t('tg.subtitle')}
         </p>
       </div>
 
       {loading ? (
         <div className="radar-card p-12 text-center text-radar-muted">
           <Loader2 className="w-6 h-6 text-radar-accent animate-spin mx-auto mb-2" />
-          <span className="text-xs">Загрузка статуса привязки...</span>
+          <span className="text-xs">Загрузка...</span>
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Connection Status Card */}
           <div className="radar-card p-6 border-radar-border bg-[#111724]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -69,15 +69,15 @@ export default function TelegramSettingsPage() {
                   <Send className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Статус подключения бота</h3>
+                  <h3 className="text-sm font-semibold text-white">{t('tg.statusTitle')}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
                     {data?.isConnected ? (
                       <span className="inline-flex items-center gap-1.5 text-xs text-radar-accent font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Подключено (@{data.botUsername})
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {t('tg.connected')} (@{data.botUsername})
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs text-radar-warning font-medium">
-                        <AlertTriangle className="w-3.5 h-3.5" /> Ожидает привязки
+                        <AlertTriangle className="w-3.5 h-3.5" /> {t('tg.waiting')}
                       </span>
                     )}
                   </div>
@@ -95,7 +95,7 @@ export default function TelegramSettingsPage() {
                   ) : (
                     <Sparkles className="w-3.5 h-3.5 text-radar-accent" />
                   )}
-                  Отправить тест
+                  {t('tg.testBtn')}
                 </button>
               </div>
             </div>
@@ -107,10 +107,9 @@ export default function TelegramSettingsPage() {
             )}
           </div>
 
-          {/* Instructions Step-by-Step (Spec 5.2) */}
           <div className="radar-card p-6 space-y-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider text-xs">
-              Инструкция по подключению за 2 шага
+              {t('tg.instTitle')}
             </h3>
 
             <div className="space-y-3 text-xs text-radar-muted">
@@ -119,7 +118,7 @@ export default function TelegramSettingsPage() {
                   1
                 </span>
                 <div>
-                  <div className="text-white font-medium mb-0.5">Перейдите по персональной ссылке:</div>
+                  <div className="text-white font-medium mb-0.5">{t('tg.step1')}</div>
                   <a
                     href={data?.deepLink}
                     target="_blank"
@@ -137,9 +136,9 @@ export default function TelegramSettingsPage() {
                   2
                 </span>
                 <div>
-                  <div className="text-white font-medium mb-0.5">В открывшемся Telegram нажмите кнопку «Start»</div>
+                  <div className="text-white font-medium mb-0.5">{t('tg.step2')}</div>
                   <p className="text-radar-muted text-[11px] leading-relaxed">
-                    Бот автоматически привяжет ваш аккаунт по уникальному токену и подтвердит готовность к доставке алертов.
+                    {t('tg.step2Desc')}
                   </p>
                 </div>
               </div>
@@ -153,7 +152,7 @@ export default function TelegramSettingsPage() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-semibold text-xs shadow-md transition"
               >
                 <Send className="w-4 h-4" />
-                Открыть Telegram и нажать Start
+                {t('tg.openBtn')}
               </a>
             </div>
           </div>

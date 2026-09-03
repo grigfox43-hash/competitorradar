@@ -1,24 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Globe, Tag, Clock, Sparkles, Loader2 } from 'lucide-react';
 import { FrequencyType } from '@/lib/types';
+import { useLanguage } from '@/lib/i18n';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  userPlan: string;
+  userPlan?: string;
 }
 
-export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Props) {
+export function AddCompetitorModal({ isOpen, onClose, onSuccess }: Props) {
+  const { t } = useLanguage();
   const [url, setUrl] = useState('');
   const [label, setLabel] = useState('');
-  const [frequency, setFrequency] = useState<FrequencyType>(
-    userPlan === 'solopreneur' ? 'weekly' : 'daily'
-  );
+  const [frequency, setFrequency] = useState<FrequencyType>('daily');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -68,8 +81,16 @@ export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Pro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-lg rounded-2xl bg-radar-card border border-radar-border shadow-2xl p-6 overflow-hidden">
+    /* Backdrop overlay: clicking on empty space triggers onClose */
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+    >
+      {/* Dialog card: stopPropagation so clicks inside form do NOT close the modal */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-lg rounded-2xl bg-radar-card border border-radar-border shadow-2xl p-6 overflow-hidden"
+      >
         {/* Decorative corner glow */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-radar-accent/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -79,14 +100,15 @@ export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Pro
               <Globe className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">Добавить сайт конкурента</h3>
-              <p className="text-xs text-radar-muted">AI сформирует baseline snapshot для отслеживания</p>
+              <h3 className="text-base font-semibold text-white">{t('modal.title')}</h3>
+              <p className="text-xs text-radar-muted">{t('modal.subtitle')}</p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={loading}
             className="p-1 rounded-lg text-radar-muted hover:text-white hover:bg-[#161C28] transition"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -102,7 +124,7 @@ export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Pro
           {/* URL Input */}
           <div>
             <label className="block text-xs font-medium text-radar-muted mb-1.5">
-              URL страницы для мониторинга <span className="text-radar-alert">*</span>
+              {t('modal.urlLabel')} <span className="text-radar-alert">*</span>
             </label>
             <div className="relative">
               <Globe className="absolute left-3.5 top-3 w-4 h-4 text-radar-muted" />
@@ -111,20 +133,20 @@ export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Pro
                 required
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
-                placeholder="https://example.com/pricing"
+                placeholder={t('modal.urlPlaceholder')}
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-2.5 bg-[#0B0E14] border border-radar-border rounded-xl text-sm text-white placeholder:text-radar-muted/50 focus:outline-none focus:border-radar-accent/60 transition"
               />
             </div>
             <p className="text-[11px] text-radar-muted/80 mt-1">
-              Рекомендуется указывать страницы цен, тарифов, фич или главных офферов
+              {t('modal.urlHint')}
             </p>
           </div>
 
           {/* Label Input */}
           <div>
             <label className="block text-xs font-medium text-radar-muted mb-1.5">
-              Название конкурента (лейбл)
+              {t('modal.nameLabel')}
             </label>
             <div className="relative">
               <Tag className="absolute left-3.5 top-3 w-4 h-4 text-radar-muted" />
@@ -132,40 +154,31 @@ export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Pro
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="Например: Acme Corp Pricing"
+                placeholder={t('modal.namePlaceholder')}
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-2.5 bg-[#0B0E14] border border-radar-border rounded-xl text-sm text-white placeholder:text-radar-muted/50 focus:outline-none focus:border-radar-accent/60 transition"
               />
             </div>
           </div>
 
-          {/* Frequency Select */}
+          {/* Frequency Select (Unlocked) */}
           <div>
             <label className="block text-xs font-medium text-radar-muted mb-1.5">
-              Частота проверок
+              {t('modal.freqLabel')}
             </label>
             <div className="relative">
               <Clock className="absolute left-3.5 top-3 w-4 h-4 text-radar-muted" />
               <select
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as FrequencyType)}
-                disabled={loading || userPlan === 'solopreneur'}
-                className="w-full pl-10 pr-4 py-2.5 bg-[#0B0E14] border border-radar-border rounded-xl text-sm text-white focus:outline-none focus:border-radar-accent/60 transition disabled:opacity-60"
+                disabled={loading}
+                className="w-full pl-10 pr-4 py-2.5 bg-[#0B0E14] border border-radar-border rounded-xl text-sm text-white focus:outline-none focus:border-radar-accent/60 transition"
               >
-                <option value="weekly">Еженедельно (Доступно на всех тарифах)</option>
-                <option value="daily" disabled={userPlan === 'solopreneur'}>
-                  Ежедневно {userPlan === 'solopreneur' ? '(Требуется тариф Business)' : ''}
-                </option>
-                <option value="realtime" disabled={userPlan !== 'enterprise'}>
-                  Реалтайм (каждые 1-3 часа) {userPlan !== 'enterprise' ? '(Только Enterprise)' : ''}
-                </option>
+                <option value="daily">{t('comp.daily')}</option>
+                <option value="weekly">{t('comp.weekly')}</option>
+                <option value="realtime">{t('comp.realtime')} (1–3h)</option>
               </select>
             </div>
-            {userPlan === 'solopreneur' && (
-              <p className="text-[11px] text-radar-warning mt-1">
-                На тарифе Solopreneur доступен еженедельный мониторинг. Обновите тариф для ежедневных проверок.
-              </p>
-            )}
           </div>
 
           {/* Action buttons */}
@@ -176,7 +189,7 @@ export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Pro
               disabled={loading}
               className="px-4 py-2 text-xs font-medium text-radar-muted hover:text-white transition"
             >
-              Отмена
+              {t('modal.cancel')}
             </button>
             <button
               type="submit"
@@ -186,12 +199,12 @@ export function AddCompetitorModal({ isOpen, onClose, onSuccess, userPlan }: Pro
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Парсинг и сохранение...
+                  {t('modal.submitting')}
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Добавить и создать снимок
+                  {t('modal.submit')}
                 </>
               )}
             </button>
