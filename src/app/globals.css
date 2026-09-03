@@ -8,20 +8,20 @@
   --background-end-rgb: 11, 14, 20;
 }
 
-/* Smooth anchor scrolling */
+/* Global Smooth anchor scrolling */
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: smooth !important;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: #0B0E14;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  overflow-x: hidden;
+  overflow-x: clip; /* Using clip instead of hidden preserves native smooth scroll in Chromium/WebKit */
 }
 
 /* Offset for fixed navbar on anchor navigation */
-section[id] {
+section[id], div[id] {
   scroll-margin-top: 5rem;
 }
 

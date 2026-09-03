@@ -37,6 +37,19 @@ export default function LandingPage() {
         if (data?.user) setUser(data.user);
       })
       .catch(() => {});
+
+    // Smooth scroll on initial load if hash is present
+    if (window.location.hash) {
+      const id = window.location.hash.substring(1);
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) {
+          const navbarOffset = 70;
+          const pos = el.getBoundingClientRect().top + window.pageYOffset - navbarOffset;
+          window.scrollTo({ top: pos, behavior: 'smooth' });
+        }
+      }, 150);
+    }
   }, []);
 
   const openAuth = (mode: 'login' | 'signup' = 'signup') => {
@@ -46,6 +59,17 @@ export default function LandingPage() {
     }
     setAuthModalMode(mode);
     setAuthModalOpen(true);
+  };
+
+  const handleHeroScroll = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (el) {
+      const navbarOffset = 70;
+      const pos = el.getBoundingClientRect().top + window.pageYOffset - navbarOffset;
+      window.scrollTo({ top: pos, behavior: 'smooth' });
+      window.history.pushState(null, '', `#${id}`);
+    }
   };
 
   const toggleFaq = (idx: number) => {
@@ -93,7 +117,8 @@ export default function LandingPage() {
                 </button>
                 <a
                   href="#how-it-works"
-                  className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-radar-card border border-radar-border hover:border-radar-accent/40 text-radar-text font-medium text-base hover:bg-[#161C28] transition-all flex items-center justify-center gap-2"
+                  onClick={(e) => handleHeroScroll(e, 'how-it-works')}
+                  className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-radar-card border border-radar-border hover:border-radar-accent/40 text-radar-text font-medium text-base hover:bg-[#161C28] transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {t('hero.howBtn')}
                 </a>
@@ -126,8 +151,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 2. КАК ЭТО РАБОТАЕТ (Плавный скролл) */}
+      {/* 2. КАК ЭТО РАБОТАЕТ И ТЕХНОЛОГИИ (Плавный скролл) */}
       <section id="how-it-works" className="py-24 border-b border-radar-border/40 relative scroll-mt-20">
+        <div id="tech" className="absolute -top-20" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
             <span className="text-xs uppercase tracking-widest text-radar-accent font-semibold">
@@ -362,7 +388,7 @@ export default function LandingPage() {
           <div className="pt-2">
             <button
               onClick={() => openAuth('signup')}
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-bold text-base shadow-[0_0_30px_rgba(61,255,176,0.35)] transition-all group"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-bold text-base shadow-[0_0_30px_rgba(61,255,176,0.35)] transition-all group cursor-pointer"
             >
               <Radar className="w-5 h-5 group-hover:-rotate-45 transition-transform" />
               <span>{user ? t('nav.dashboard') : t('cta.btn')}</span>

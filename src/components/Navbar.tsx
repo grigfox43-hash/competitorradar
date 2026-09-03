@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Radar, Menu, X, ArrowRight, UserCheck, LogOut } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -9,6 +10,7 @@ import { AuthModal } from './AuthModal';
 import { SHOW_BILLING } from '@/lib/config';
 
 export function Navbar() {
+  const pathname = usePathname();
   const { t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null);
@@ -23,6 +25,28 @@ export function Navbar() {
       })
       .catch(() => {});
   }, []);
+
+  // Smooth scroll handler for anchor links
+  const handleScrollToAnchor = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    if (pathname === '/' || pathname === '') {
+      e.preventDefault();
+      setMobileMenuOpen(false);
+
+      const target = document.getElementById(targetId);
+      if (target) {
+        const navbarOffset = 70;
+        const elementPosition = target.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - navbarOffset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth',
+        });
+
+        window.history.pushState(null, '', `#${targetId}`);
+      }
+    }
+  };
 
   const openAuth = (mode: 'login' | 'signup') => {
     setAuthModalMode(mode);
@@ -59,23 +83,39 @@ export function Navbar() {
 
             {/* Desktop Nav Links */}
             <div className="hidden md:flex items-center gap-8 text-sm font-medium text-radar-muted">
-              <Link href="/#how-it-works" className="hover:text-radar-text transition-colors">
+              <a
+                href="/#how-it-works"
+                onClick={(e) => handleScrollToAnchor(e, 'how-it-works')}
+                className="hover:text-radar-text transition-colors cursor-pointer"
+              >
                 {t('nav.howItWorks')}
-              </Link>
-              <Link href="/#features" className="hover:text-radar-text transition-colors">
+              </a>
+              <a
+                href="/#features"
+                onClick={(e) => handleScrollToAnchor(e, 'features')}
+                className="hover:text-radar-text transition-colors cursor-pointer"
+              >
                 {t('nav.features')}
-              </Link>
+              </a>
+              <a
+                href="/#tech"
+                onClick={(e) => handleScrollToAnchor(e, 'tech')}
+                className="hover:text-radar-text transition-colors cursor-pointer"
+              >
+                {t('nav.tech')}
+              </a>
               {SHOW_BILLING && (
                 <Link href="/pricing" className="hover:text-radar-text transition-colors">
                   {t('nav.pricing')}
                 </Link>
               )}
-              <Link href="/how-it-works" className="hover:text-radar-text transition-colors">
-                {t('nav.tech')}
-              </Link>
-              <Link href="/#faq" className="hover:text-radar-text transition-colors">
+              <a
+                href="/#faq"
+                onClick={(e) => handleScrollToAnchor(e, 'faq')}
+                className="hover:text-radar-text transition-colors cursor-pointer"
+              >
                 {t('nav.faq')}
-              </Link>
+              </a>
             </div>
 
             {/* Action CTAs & Language Switcher */}
@@ -135,34 +175,34 @@ export function Navbar() {
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-b border-radar-border bg-radar-card px-4 pt-3 pb-5 space-y-3">
-            <Link
+            <a
               href="/#how-it-works"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleScrollToAnchor(e, 'how-it-works')}
               className="block text-base text-radar-muted hover:text-white py-1"
             >
               {t('nav.howItWorks')}
-            </Link>
-            <Link
+            </a>
+            <a
               href="/#features"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleScrollToAnchor(e, 'features')}
               className="block text-base text-radar-muted hover:text-white py-1"
             >
               {t('nav.features')}
-            </Link>
-            <Link
-              href="/how-it-works"
-              onClick={() => setMobileMenuOpen(false)}
+            </a>
+            <a
+              href="/#tech"
+              onClick={(e) => handleScrollToAnchor(e, 'tech')}
               className="block text-base text-radar-muted hover:text-white py-1"
             >
               {t('nav.tech')}
-            </Link>
-            <Link
+            </a>
+            <a
               href="/#faq"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => handleScrollToAnchor(e, 'faq')}
               className="block text-base text-radar-muted hover:text-white py-1"
             >
               {t('nav.faq')}
-            </Link>
+            </a>
             <div className="pt-2 flex flex-col gap-2">
               {user ? (
                 <Link
