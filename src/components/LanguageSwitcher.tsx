@@ -61,9 +61,9 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
       title={language === 'ru' ? 'Switch to English' : 'Переключить на русский'}
       aria-label="Switch language"
     >
-      {language === 'ru' ? <FlagRU /> : <FlagGB />}
+      {language === 'ru' ? <FlagGB /> : <FlagRU />}
       <span className="font-mono font-bold tracking-wide text-radar-accent uppercase">
-        {language === 'ru' ? 'RU' : 'EN'}
+        {language === 'ru' ? 'EN' : 'RU'}
       </span>
     </button>
   );
