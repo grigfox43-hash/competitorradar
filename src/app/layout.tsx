@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { LanguageProvider } from '@/lib/i18n';
+import { CookieBanner } from '@/components/CookieBanner';
 
 export const metadata: Metadata = {
   title: 'CompetitorRadar — AI-разведчик изменений сайтов конкурентов',
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-radar-bg text-radar-text antialiased selection:bg-radar-accent selection:text-black">
         <LanguageProvider>
           {children}
+          <CookieBanner />
         </LanguageProvider>
       </body>
     </html>

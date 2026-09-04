@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { X, Radar, Mail, Lock, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 
@@ -15,6 +16,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signup' }: Props) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [consentGiven, setConsentGiven] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +44,14 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signup' }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (mode === 'signup' && !consentGiven) {
+      setError(
+        `${t('legal.ageConfirm')} ${t('legal.terms')} ${t('legal.and')} ${t('legal.privacy')} ${t('legal.consentText')}`
+      );
+      return;
+    }
+
     setLoading(true);
 
     const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
@@ -176,16 +186,40 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signup' }: Props) {
           </div>
 
           {mode === 'signup' && (
-            <div className="p-3 rounded-xl bg-[#141A25] border border-radar-border/70 flex items-center gap-2 text-xs text-radar-muted">
-              <ShieldCheck className="w-4 h-4 text-radar-accent flex-shrink-0" />
-              <span>{t('hero.trust1')} • {t('hero.trust2')}</span>
-            </div>
+            <>
+              <div className="p-3 rounded-xl bg-[#141A25] border border-radar-border/70 flex items-center gap-2 text-xs text-radar-muted">
+                <ShieldCheck className="w-4 h-4 text-radar-accent flex-shrink-0" />
+                <span>{t('hero.trust1')} • {t('hero.trust2')}</span>
+              </div>
+
+              <div className="flex items-start gap-2.5 pt-1">
+                <input
+                  type="checkbox"
+                  id="authConsentModal"
+                  required
+                  checked={consentGiven}
+                  onChange={(e) => setConsentGiven(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded bg-[#0B0E14] border border-radar-border text-radar-accent focus:ring-radar-accent/30 cursor-pointer flex-shrink-0"
+                />
+                <label htmlFor="authConsentModal" className="text-[11px] text-radar-muted leading-tight cursor-pointer select-none">
+                  {t('legal.ageConfirm')}{' '}
+                  <Link href="/terms" target="_blank" className="text-radar-accent underline hover:text-white">
+                    {t('legal.terms')}
+                  </Link>{' '}
+                  {t('legal.and')}{' '}
+                  <Link href="/privacy" target="_blank" className="text-radar-accent underline hover:text-white">
+                    {t('legal.privacy')}
+                  </Link>{' '}
+                  {t('legal.consentText')}
+                </label>
+              </div>
+            </>
           )}
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-bold text-sm shadow-[0_0_20px_rgba(61,255,176,0.25)] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            disabled={loading || (mode === 'signup' && !consentGiven)}
+            className="w-full py-3 rounded-xl bg-radar-accent hover:bg-radar-accent/90 text-black font-bold text-sm shadow-[0_0_20px_rgba(61,255,176,0.25)] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
